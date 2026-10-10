@@ -170,7 +170,7 @@ debug: $(UCOREIMG) $(SWAPIMG) $(SFSIMG)
 		-machine virt \
 		-nographic \
 		-bios default \
-		-kernel $(UCOREIMG)
+		-kernel $(UCOREIMG) \
 		-s -S
 
 gdb:
