@@ -1,0 +1,10 @@
+
+bin/kernel:     file format elf64-littleriscv
+
+
+Disassembly of section .text:
+
+0000000080200000 <kern_entry>:
+    80200000:	00003117          	auipc	sp,0x3
+    80200004:	00010113          	addi	sp,sp,0 # 80203000 <SBI_CONSOLE_PUTCHAR>
+    80200008:	a009                	c.j	8020000a <kern_init>

@@ -1,0 +1,3 @@
+a21c11243b36836e7c42ffa13b0539a1cd2ee712386bd0b4cd60468b1c3467fd  /mnt/c/Users/zyc/Desktop/操作系统/OS/lab1/code/bin/ucore.img
+a21c11243b36836e7c42ffa13b0539a1cd2ee712386bd0b4cd60468b1c3467fd  /mnt/c/Users/zyc/Desktop/操作系统/lab1-report-review/build-check/bin/ucore.img
+Original and rebuilt raw images identical: True

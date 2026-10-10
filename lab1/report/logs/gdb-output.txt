@@ -1,0 +1,69 @@
+The target architecture is set to "riscv:rv64".
+0x0000000000001000 in ?? ()
+=== RESET ===pc             0x1000	0x1000
+=> 0x1000:	auipc	t0,0x0
+   0x1004:	addi	a2,t0,40
+   0x1008:	csrr	a0,mhartid
+   0x100c:	ld	a1,32(t0)
+   0x1010:	ld	t0,24(t0)
+   0x1014:	jr	t0
+0x1018:	0x0000000080000000	0x0000000087000000
+0x0000000000001004 in ?? ()
+pc             0x1004	0x1004
+t0             0x1000	4096
+0x0000000000001008 in ?? ()
+pc             0x1008	0x1008
+a2             0x1028	4136
+0x000000000000100c in ?? ()
+pc             0x100c	0x100c
+a0             0x0	0
+0x0000000000001010 in ?? ()
+pc             0x1010	0x1010
+a1             0x87000000	2264924160
+0x0000000000001014 in ?? ()
+pc             0x1014	0x1014
+t0             0x80000000	2147483648
+0x0000000080000000 in ?? ()
+=== FIRMWARE ENTRY ===pc             0x80000000	0x80000000
+a0             0x0	0
+a1             0x87000000	2264924160
+a2             0x1028	4136
+=> 0x80000000:	add	s0,a0,zero
+   0x80000004:	add	s1,a1,zero
+   0x80000008:	add	s2,a2,zero
+   0x8000000c:	jal	0x800006a0
+   0x80000010:	add	a6,a0,zero
+   0x80000014:	add	a0,s0,zero
+   0x80000018:	add	a1,s1,zero
+   0x8000001c:	add	a2,s2,zero
+0x1028:	0x000000004942534f	0x0000000000000002
+0x1038:	0x0000000080200000	0x0000000000000001
+0x1048:	0x0000000000000000	0x0000000000000000
+Breakpoint 1 at 0x80200000: file kern/init/entry.S, line 7.
+
+Breakpoint 1, kern_entry () at kern/init/entry.S:7
+7	    la sp, bootstacktop
+=== KERNEL ENTRY ===pc             0x80200000	0x80200000 <kern_entry>
+sp             0x80017ee0	0x80017ee0
+ra             0x800078cc	0x800078cc
+a0             0x0	0
+a1             0x87000000	2264924160
+priv           0x1	prv:1 [Supervisor]
+$1 = 0x80201000
+$2 = 0x80203000
+=> 0x80200000 <kern_entry>:	auipc	sp,0x3
+   0x80200004 <kern_entry+4>:	mv	sp,sp
+   0x80200008 <kern_entry+8>:	j	0x8020000a <kern_init>
+0x0000000080200004 in kern_entry () at kern/init/entry.S:7
+7	    la sp, bootstacktop
+pc             0x80200004	0x80200004 <kern_entry+4>
+sp             0x80203000	0x80203000 <SBI_CONSOLE_PUTCHAR>
+9	    tail kern_init
+pc             0x80200008	0x80200008 <kern_entry+8>
+sp             0x80203000	0x80203000 <SBI_CONSOLE_PUTCHAR>
+kern_init () at kern/init/init.c:8
+8	    memset(edata, 0, end - edata);
+=== C ENTRY ===pc             0x8020000a	0x8020000a <kern_init>
+sp             0x80203000	0x80203000 <SBI_CONSOLE_PUTCHAR>
+ra             0x800078cc	0x800078cc
+[Inferior 1 (process 1) detached]
