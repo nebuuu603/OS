@@ -56,7 +56,7 @@
 | 工具链安装目录 | `$HOME/opt/riscv` |
 | 当前完整源码目录 | `lab1\code` |
 
-上表记录原实验截图使用的工具链。2026-10-10 的补充复核使用系统 GCC 10.2.0、显式指定的 `/usr/bin/qemu-system-riscv64` 6.2.0，以及本机 GDB 16.3.90.20250610-git。复核时在独立源码副本中重新编译，所得原始镜像与当前代码目录中的 `bin/ucore.img` 逐字节一致，因而后文的入口地址和寄存器记录对应当前源码。原截图与补充日志分别保留各自的工具版本。
+上表记录原实验截图使用的工具链。2026-10-10 的补充复核使用系统 GCC 10.2.0、显式指定的 `/usr/bin/qemu-system-riscv64` 4.1.1，以及本机 GDB 16.3.90.20250610-git。复核时在独立源码副本中重新编译，所得原始镜像与当前代码目录中的 `bin/ucore.img` 逐字节一致，因1而后文的入口地址和寄存器记录对应当前源码。原截图与补充日志分别保留各自的工具版本。
 
 在 `~/.bashrc` 末尾添加：
 
@@ -216,35 +216,8 @@ WSL 中用 QEMU 和 SiFive GDB 跟踪从复位地址到内核入口的过程。�
 
 #### 练习二 A：环境与启动问题处理（于子朔负责）
 
-**问题一：内核已编译，但只有 OpenSBI 输出。**
 
-原 Makefile 使用：
-
-```make
--device loader,file=$(UCOREIMG),addr=0x80200000
-```
-
-终端显示 `Domain0 Next Address : 0x0000000000000000`，且没有内核启动信息。在本次 QEMU 6.2.0 与默认 OpenSBI 的组合下，这种加载方式没有正确配置固件的后续入口。将 `qemu` 和 `debug` 两个目标都改为：
-
-```make
--kernel $(UCOREIMG)
-```
-
-随后成功输出 `(THU.CST) os is loading ...`。`debug` 目标保留 `-s -S`：
-
-```make
-debug: $(UCOREIMG) $(SWAPIMG) $(SFSIMG)
-	$(V)$(QEMU) \
-		-machine virt \
-		-nographic \
-		-bios default \
-		-kernel $(UCOREIMG) \
-		-s -S
-```
-
-`-s` 等价于 `-gdb tcp::1234`，在 TCP 1234 端口开启 GDB 服务，`-S` 在启动时暂停 CPU。因此执行 `make debug` 后暂时没有输出属于正常等待状态。
-
-**问题二：`make gdb` 找不到调试器。**
+**问题一：`make gdb` 找不到调试器。**
 
 最初的系统工具包可以编译内核，但没有提供 Makefile 调用的 `riscv64-unknown-elf-gdb`，报错为：
 
@@ -255,7 +228,7 @@ make: *** [Makefile:177: gdb] Error 127
 
 为统一团队环境，安装 SiFive 预编译工具链并配置 PATH。之后 GCC 和 GDB 都从 `/home/surrender/opt/riscv/bin/` 加载，`make gdb` 成功连接 QEMU。
 
-**问题三：入口断点设置成功，但 `continue` 后不命中。**
+**问题二：入口断点设置成功，但 `continue` 后不命中。**
 
 只验证普通启动成功不足以保证调试启动正确。同步修改 `debug` 目标中的加载参数并重新启动 QEMU 后，断点成功命中 `kern_entry`。
 
