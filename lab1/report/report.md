@@ -50,7 +50,7 @@
 | Linux 发行版 | Ubuntu 22.04 |
 | 交叉编译器 | SiFive GCC-Metal 10.2.0-2020.12.8，GCC 10.2.0 |
 | 调试器 | SiFive GDB-Metal 10.1.0-2020.12.7，GDB 10.1 |
-| 模拟器 | QEMU 6.2.0（Ubuntu 软件包） |
+| 模拟器 | QEMU 4.1.1（Ubuntu 软件包） |
 | 固件 | QEMU 默认 OpenSBI v0.9，Runtime SBI Version 0.2 |
 | 模拟平台 | `virt`，RISC-V 64 位 |
 | 工具链安装目录 | `$HOME/opt/riscv` |
@@ -537,7 +537,7 @@ riscv64-unknown-elf-objcopy bin/kernel --strip-all -O binary bin/ucore.img
 
 1. 将源码复制到独立构建目录，排除原有 `obj` 和 `bin`，执行 `make GCCPREFIX=/usr/bin/riscv64-unknown-elf- -j2`，编译、链接及镜像生成成功。
 2. 将新生成的原始镜像与代码目录原有 `bin/ucore.img` 按字节比较，结果完全一致。两者 SHA-256 均为 `a21c11243b36836e7c42ffa13b0539a1cd2ee712386bd0b4cd60468b1c3467fd`。
-3. 使用 QEMU 6.2.0 启动已有镜像，GDB 逐条执行复位指令、检查固件信息、命中内核断点并验证启动栈；恢复运行后出现 `(THU.CST) os is loading ...`。
+3. 使用 QEMU 4.1.1 启动已有镜像，GDB 逐条执行复位指令、检查固件信息、命中内核断点并验证启动栈；恢复运行后出现 `(THU.CST) os is loading ...`。
 
 补充复核显式指定 QEMU 路径，避免 PATH 中的 QEMU 7.0.0 改变验证环境；为避免占用常规调试端口，使用 12345 端口。其余关键启动参数与代码中的 `debug` 目标一致：
 
