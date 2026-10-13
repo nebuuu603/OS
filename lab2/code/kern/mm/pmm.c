@@ -63,6 +63,115 @@ size_t nr_free_pages(void) {
 
 //lab2 function1 YOUR CODE
 
+static void page_init(void) {
+    extern char end[];
+
+    uint64_t mem_base;
+    uint64_t mem_size;
+    uint64_t mem_end;
+    uintptr_t pages_pa;
+    uintptr_t free_base;
+    size_t page_desc_count;
+    size_t free_nr;
+
+    /*
+     * 高地址虚拟内核地址与物理地址之间的偏移：
+     *
+     * VA = PA + PHYSICAL_MEMORY_OFFSET
+     */
+    va_pa_offset = PHYSICAL_MEMORY_OFFSET;
+
+    /*
+     * 从设备树获取物理内存范围。
+     * 当前 pmm 框架中的 nbase 固定以 DRAM_BASE 为起点，
+     * 因此要求设备树报告的内存起点为 DRAM_BASE。
+     */
+    mem_base = get_memory_base();
+    mem_size = get_memory_size();
+
+    if (mem_base == 0 || mem_size == 0) {
+        panic("invalid physical memory information");
+    }
+
+    if (mem_base != DRAM_BASE) {
+        panic("unsupported physical memory base");
+    }
+
+    mem_end = mem_base + mem_size;
+
+    /* 检查无符号整数加法是否溢出 */
+    if (mem_end <= mem_base) {
+        panic("physical memory range overflow");
+    }
+
+    /*
+     * npage 表示物理内存末尾对应的物理页号。
+     * 例如：
+     *   mem_base = 0x80000000
+     *   mem_end  = 0x88000000
+     *   npage    = 0x88000
+     */
+    npage = PPN(mem_end);
+
+    if (npage <= nbase) {
+        panic("physical memory is smaller than DRAM base");
+    }
+
+    /*
+     * end 是高地址虚拟地址。
+     * Page 描述符数组放在内核镜像结束位置之后，并按页对齐。
+     */
+    pages = (struct Page *)ROUNDUP((uintptr_t)end, PGSIZE);
+
+    if ((uintptr_t)pages < KERNBASE) {
+        panic("invalid pages virtual address");
+    }
+
+    page_desc_count = npage - nbase;
+
+    /*
+     * 初始化所有 Page 描述符为 reserved。
+     * 后面只有真正可用的物理页会交给 init_memmap()。
+     */
+    for (size_t i = 0; i < page_desc_count; i++) {
+        pages[i].flags = 0;
+        pages[i].property = 0;
+        pages[i].ref = 0;
+        SetPageReserved(&pages[i]);
+    }
+
+    /*
+     * 将高地址虚拟地址转换为 Page 描述符数组对应的物理地址。
+     */
+    pages_pa = PADDR((uintptr_t)pages);
+
+    /*
+     * Page 描述符数组本身占用的物理空间也必须保留。
+     * free_base 是真正可分配物理内存的起始地址。
+     */
+    free_base = pages_pa +
+        ROUNDUP(page_desc_count * sizeof(struct Page), PGSIZE);
+
+    if (free_base < pages_pa || free_base >= mem_end) {
+        panic("no usable physical memory after page descriptors");
+    }
+
+    /*
+     * 只登记完整的物理页。
+     */
+    free_nr = (mem_end - free_base) / PGSIZE;
+
+    if (free_nr == 0) {
+        panic("no free physical pages");
+    }
+
+    /*
+     * 建立空闲物理页管理区。
+     * free_base 已经是物理地址，需要转换成对应的 Page 描述符。
+     */
+    init_memmap(pa2page(free_base), free_nr);
+}
+
 /* pmm_init - initialize the physical memory management */
 void pmm_init(void) {
     // We need to alloc/free the physical memory (granularity is 4KB or other size).
