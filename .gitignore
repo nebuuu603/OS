@@ -2,3 +2,8 @@ lab1/code/bin/
 lab1/code/obj/
 lab1/code/.qemu.out
 lab1/code/.gdb.in
+
+lab2/code/bin/
+lab2/code/obj/
+lab2/code/.qemu.out
+lab2/code/.gdb.in
