@@ -113,7 +113,7 @@ KCFLAGS		+= $(addprefix -I,$(KINCLUDE))
 
 ifeq ($(MAKECMDGOALS),test)
 $(call add_files_cc2,$(call listf_cc,$(KSRCDIR)),kernel,$(KCFLAGS))
-else ifeq ($(MAKECMDGOALS),ctest)
+else ifeq ($(MAKECMDGOALS),ctest-run)
 $(call add_files_cc3,$(call listf_cc,$(KSRCDIR)),kernel,$(KCFLAGS))
 else
 $(call add_files_cc,$(call listf_cc,$(KSRCDIR)),kernel,$(KCFLAGS))
@@ -163,7 +163,7 @@ endif
 TARGETS: $(TARGETS)
 
 .DEFAULT_GOAL := TARGETS
-.PHONY: qemu spike test ctest
+.PHONY: qemu spike test ctest ctest-run
 qemu: $(UCOREIMG) $(SWAPIMG) $(SFSIMG)
 	$(V)$(QEMU) \
 		-machine virt \
@@ -192,8 +192,14 @@ test: $(UCOREIMG) $(SWAPIMG) $(SFSIMG)
 		-bios default \
 		-kernel $(UCOREIMG)
 
-# lab2 成员 C：带 Buddy System / SLUB 自测的构建与运行
-ctest: $(UCOREIMG) $(SWAPIMG) $(SFSIMG)
+# lab2 成员 C：带 Buddy System / SLUB 自测的构建与运行。
+# 先 clean 再递归进入 ctest-run，确保所有目标文件都用 -DLAB2_C_TEST 重新编译
+# （否则会复用默认构建的 obj，自测代码根本不会被调用）。
+ctest:
+	$(V)$(MAKE) $(MAKEOPTS) clean
+	$(V)$(MAKE) $(MAKEOPTS) ctest-run
+
+ctest-run: $(UCOREIMG) $(SWAPIMG) $(SFSIMG)
 	$(V)$(QEMU) \
 		-machine virt \
 		-nographic \

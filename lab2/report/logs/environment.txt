@@ -1,0 +1,10 @@
+date:    2026-10-22 15:39:59 CST
+kernel:  Linux 6.6.87.2-microsoft-standard-WSL2 x86_64 GNU/Linux
+distro:  Ubuntu 22.04.5 LTS
+gcc:     gcc (Ubuntu 11.4.0-1ubuntu1~22.04.3) 11.4.0
+riscv-gcc: riscv64-unknown-elf-gcc () 10.2.0
+riscv-ld:  GNU ld () 2.35.1
+qemu:    QEMU emulator version 6.2.0 (Debian 1:6.2+dfsg-2ubuntu6.31)
+gdb:     GNU gdb (Ubuntu 12.1-0ubuntu1~22.04.2) 12.1
+path riscv-gcc: /usr/bin/riscv64-unknown-elf-gcc
+path qemu:      /usr/bin/qemu-system-riscv64
