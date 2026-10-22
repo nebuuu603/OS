@@ -145,6 +145,294 @@ OS 可以在启动时通过固件或引导程序提供的硬件信息获取可�
 
 ---
 
+### 功能模块：[Buddy System 连续物理内存分配]
+
+**负责人：** [2412855-张雅程]
+
+#### 模块功能描述
+
+**需要实现/修改的文件：**
+
+```c
+kern/mm/buddy_pmm.c    // Buddy System 分配器实现
+kern/mm/buddy_pmm.h    // 对外接口与自测声明
+kern/mm/lab2_c_test.c  // 自测入口（仅在 -DLAB2_C_TEST 时被 pmm_init 调用）
+```
+
+**功能说明：**
+
+- 按 2 的幂把空闲物理内存划分成“块”，每个 order（1, 2, 4, 8, … 32768 页）维护一条按物理地址升序的空闲链表，作为 `pmm_manager` 的又一个实例 `buddy_pmm_manager` 接入内核。
+- 分配时把请求页数向上取整到 2 的幂（`alloc_pages(3)` 实际占用 4 页），从最小的够用块中逐级分裂；释放时按同样规则还原 order，并与地址异或得到伙伴块，逐级合并。
+- 实现 `init / init_memmap / alloc_pages / free_pages / nr_free_pages / check` 六个回调，可像 First-Fit、Best-Fit 一样被 `init_pmm_manager()` 选中。
+
+#### 设计思路
+
+**数据结构。** 不修改框架的 `struct Page`，复用它的三个字段：块首页用 `property` 记录块的 order、用 `PG_property` 标记“这是空闲块头”、用 `page_link` 挂到对应 order 的链表上；非块头的页 `flags` 与 `property` 都为 0。
+
+```c
+struct buddy_free_area {
+    list_entry_t free_list;   /* 该 order 的空闲块头 */
+    size_t nr_free;           /* 该 order 的空闲页数 */
+};
+static struct buddy_free_area buddy_free_areas[BUDDY_MAX_ORDER + 1];
+static size_t buddy_nr_free;      /* 全局空闲页数 */
+```
+
+**初始化。** 把 `[base, base + n)` 贪心地切成“绝对页号对齐、且剩余空间足够”的最大 2 幂块，逐块插入。这样即使区域起点不是 2 的幂对齐（例如内核之后的空闲区从 `0x80346` 开始），也不会切出跨越区域边界的伙伴块。
+
+**分配。** 计算 `order = ceil(log2(n))`，从该 order 往上找到第一条非空链表，摘下块头，再从高到低逐级分裂，把多出来的后半块插回低一级链表；返回的块头清掉 `PG_property`。
+
+**释放与合并。** 把 `n` 还原成 order 后，令 `buddy_ppn = start ^ (1 << order)`：若伙伴块也在空闲链表中、order 相同，就把它摘下、合并、order 加一，继续向上尝试。合并后的块头永远取地址较小者，保证链表仍按物理地址升序。
+
+**两个容易出错的地方。**
+1. **记账**：合并时既要把伙伴块从对应 order 的链表和该级计数中删掉，也要从全局 `buddy_nr_free` 中减去；最后插入合并块时再加回。只在最后加、不在中途减，`nr_free` 会在一次“分配-释放”后翻倍——自测里的 `assert(total == buddy_nr_free)` 正是抓住了这个 bug。
+2. **区域保护**：合并前检查“合并后的整块”是否仍落在 `init_memmap` 登记过的某段区域内。否则，当 Buddy 只管理内存的一部分时（本实验的自测正是这种情况），可能把相邻的、属于 Best-Fit 的空闲页误当成伙伴块合并进来。
+
+#### 最终提示词
+
+**Prompt 1：生成 Buddy System 分配模块并接入内核**
+
+````markdown
+【背景】
+riscv64-ucore lab2，内核在 QEMU virt（128MiB DRAM，4KiB 页）上运行。
+物理内存管理框架在 kern/mm/pmm.h，接口是：
+
+struct pmm_manager {
+    const char *name;
+    void (*init)(void);
+    void (*init_memmap)(struct Page *base, size_t n);
+    struct Page *(*alloc_pages)(size_t n);
+    void (*free_pages)(struct Page *base, size_t n);
+    size_t (*nr_free_pages)(void);
+    void (*check)(void);
+};
+
+可用资源：struct Page（memlayout.h，字段只有 ref / flags / property / page_link，
+另有 PG_property、SetPageProperty/ClearPageProperty/PageProperty 宏）、
+libs/list.h 的双向链表、page2pa/pa2page/page2ppn、npage/nbase/pages/va_pa_offset、
+assert/panic/cprintf、set_page_ref。参考实现是 kern/mm/default_pmm.c（First-Fit）。
+
+【任务】
+新建 kern/mm/buddy_pmm.c 与 kern/mm/buddy_pmm.h，从零实现伙伴系统，
+并定义 const struct pmm_manager buddy_pmm_manager 完成注册。不要修改 struct Page，
+不要修改 default_pmm.c / best_fit_pmm.c，也不要把 init_pmm_manager() 的默认值改掉。
+
+【要求】
+1. 最大块 2^15 = 32768 页；每个 order 一条空闲链表，按物理地址升序；
+2. init_memmap(base, n) 要能处理起点不是 2 的幂对齐的区域，只切出对齐且不越界的块；
+3. alloc_pages(n) 把 n 向上取整到 2 的幂，从最小够用块分裂，支持任意 n；
+4. free_pages(base, n) 按同样规则还原 order，与 ppn^(1<<order) 的伙伴块逐级合并；
+5. 维护每个 order 的页数与全局页数，保证任何时候 sum(各级) == 全局；
+6. 记录 init_memmap 登记过的区域，合并只允许发生在同一区域内部；
+7. check() 校验：链表节点都是块头、property 等于所在 order、块首按 2^order 对齐、
+   各级页数等于该级链表页数之和、总和等于全局页数；
+8. 只能用内核已有的头文件（无 libc），必须能通过 -Wall -Werror -std=gnu99 编译。
+
+【输出】
+两个文件的完整内容，附一段说明：为什么 init_memmap 要按“对齐且不越界”切块，
+以及合并时全局计数器应当如何更新。
+````
+
+**Prompt 2：为 Buddy 实现生成测试**
+
+````markdown
+【背景】
+kern/mm/buddy_pmm.c 已实现，但我不能把它设为默认管理器（官方评分要求 Best-Fit
+处于激活状态），也不希望测试破坏当前 pmm_manager 的状态。
+
+【任务】
+写 void buddy_self_test(void)（声明放在 buddy_pmm.h），用断言完成自测。
+
+【约束】
+1. 先向当前 pmm_manager 借一段连续物理页：分配 2048 页，取其中 1024 页对齐的那一段
+   作为测试区域，这样既能保证“全部空闲时可以合并成一个 order-10 块”，又不会碰到
+   别的管理器的页；
+2. 直接调用 buddy_pmm_manager 的 init/init_memmap/alloc_pages/free_pages，不切换
+   全局 pmm_manager；
+3. 测试结束把整段 2048 页的 flags/property/ref 清零后还给当前 pmm_manager；
+4. 每个阶段都调用 buddy_check()；失败用 assert，成功打印一行 PASS。
+
+【必须覆盖】
+- 初始化后空闲页数等于区域页数；
+- 分配 1 页；分配 3 页（验证按 4 页记账）；两者互不重叠；
+- 剩余页不足时整段分配返回 NULL；
+- 释放后能否逐级合并回单个 order-10 块（用“再分配 1024 页必须成功且返回区域首地址”
+  来反向验证，这比逐个检查链表更有说服力）；
+- 耗尽时分配 1 页返回 NULL；
+- 每次分配/释放前后 check() 都通过。
+
+【输出】
+完整函数，并用一段话解释每个用例能发现哪类实现错误。
+````
+
+#### 测试与验证
+
+自测通过新增的 `make ctest` 目标运行（编译时加 `-DLAB2_C_TEST`，`pmm_init()` 末尾调用
+`lab2_c_self_test()`；默认构建不定义该宏，因此完全不影响官方评分）：
+
+```
+memory management: best_fit_pmm_manager
+check_alloc_page() succeeded!
+[Test C1] Buddy System: begin
+[Test C1]   region @0x80400000, 1024 pages
+buddy_check() succeeded!
+...
+[Test C1] Buddy System: PASS
+[Test C2] SLUB: begin
+[Test C2] SLUB: PASS
+satp virtual address: 0xffffffffc0206000
+satp physical address: 0x0000000080206000
+```
+
+| 用例 | 覆盖的行为 | 为什么能发现错误 |
+|------|-----------|------------------|
+| 初始化后 `nr_free == 1024` | 区域切分与记账 | 切块或计数错会立刻不符 |
+| 分配 1 页、3 页 | 最小分配、向上取整 | 3 页必须按 4 页记账 |
+| 分配后整段分配失败 | 耗尽检测 | 剩 1019 页不可能满足 1024 页 |
+| 释放后整段分配成功且返回 `base` | 逐级合并 | 只有完全合并成 order 10 才可能成功 |
+| 每阶段 `buddy_check()` | 链表、order、对齐、计数一致性 | 漏合并/漏记账都会触发断言 |
+
+#### 改进空间
+
+1. **时间**：当前分配是“从所需 order 向上逐条链表查找”，最坏 O(MAX_ORDER)；
+   页数很多时可以用位图（每个 order 一张 bitmap）把查找降为 O(1) 级别，代价是额外内存。
+2. **空间**：每个空闲块靠 `struct Page` 的 `property` 记录 order，需要为全部物理页
+   准备描述符数组（128MiB 就要 1.25MiB 描述符）；位图式伙伴系统只需要
+   (总页数 / 8) 字节量级的元数据。
+3. **碎片**：伙伴系统只按 2 的幂切分，请求 3 页会占 4 页，内部碎片最大接近 50%；
+   可在上层再套一层 slab/slub（本实验的 Challenge）来消化小对象。
+4. **并发**：当前实现没有加锁，多核（`-smp 2`）下需要每 order 一把自旋锁或 per-CPU 页池。
+
+---
+
+### Challenge：[SLUB 任意大小的内存单元分配算法]
+
+**负责人：** [2412855-张雅程]
+
+#### 功能说明
+
+SLUB 是“两层”分配器：第一层以页为单位向物理内存管理器申请/归还内存（框架已提供
+`kern/mm/slub_page.c`，接口是 `slub_page_alloc(&desc, nr_pages)` / `slub_page_free(&desc)`），
+第二层把页切成固定大小的小对象，按大小分级缓存，从而支持任意大小（本实现 8–2048 字节）的分配与释放。
+
+#### 设计思路
+
+- **大小分级**：8、16、32、…、2048 共 9 级，请求向上取整（`slub_alloc(1)` 落到 8 字节级，
+  `slub_alloc(24)` 落到 32 字节级）；`size == 0` 或 `> 2048` 直接返回 `NULL`。
+- **slab 布局**：一个 slab 恰好占一页。页首是 `struct slub_slab`（magic、所属 cache、
+  页描述符、两条链表节点、freelist、空闲/总对象数），其后是等长对象区；
+  空闲对象用自身的前 8 字节串成单向链表，不额外占内存。
+- **分配**：先在 `partial`（还有空对象的 slab）链表取；为空则新建 slab（页层申请一页、
+  逆序串链、挂到 `slabs` 与 `partial`）。取走最后一个对象时把该 slab 从 `partial` 摘掉。
+  返回前 `memset` 清零请求的字节数。
+- **释放**：slab 一定页对齐，所以把指针按页下取整即得 slab 头；用 magic、所属 cache、
+  地址区间与对象对齐四重校验拒绝非法指针（返回 `E_INVAL`）。归还对象后，若 slab 从“满”
+  变为“有空”则挂回 `partial`；若整个 slab 都空了且该级还有别的 slab，就把页还给页层，
+  避免长期占用。
+
+#### 最终提示词
+
+**Prompt 1：生成 SLUB 对象分配模块**
+
+````markdown
+【背景】
+riscv64-ucore lab2。页层已经写好：kern/mm/slub_page.h 提供
+
+struct slub_page { struct Page *base; void *addr; size_t nr_pages; list_entry_t link; };
+struct slub_page *slub_page_alloc(struct slub_page *page, size_t nr_pages);
+int slub_page_free(struct slub_page *page);
+
+它内部调用 alloc_pages/free_pages（当前是 Best-Fit），addr 是页的虚拟地址。
+现在要在它之上实现任意大小对象的分配层，不能修改 slub_page.c。
+
+【任务】
+新建 kern/mm/slub.c 与 kern/mm/slub.h，提供：
+void *slub_alloc(size_t size);
+int   slub_free(void *ptr);          /* 成功 0，非法指针 E_INVAL */
+size_t slub_nr_free_objects(void);
+size_t slub_nr_slabs(void);
+
+【要求】
+1. 大小分级 8,16,…,2048（9 级），请求向上取整；0 和超限返回 NULL；
+2. 每个 slab 一页：页首放元数据，其后是等长对象区；空闲对象用对象自身前 8 字节串链；
+3. 每级维护 slabs（全部）与 partial（有空对象）两条链表，记录空闲对象数与 slab 数；
+4. 分配优先用 partial，没有再向页层申请新 slab；
+5. 释放时用 magic + cache 归属 + 地址区间 + 对象对齐校验指针，拒绝空指针与野指针；
+6. slab 全空且该级 slab 数 > 1 时归还给页层，否则挂回 partial 复用；
+7. 只能使用内核头文件（defs/list/memlayout/pmm/stdio/string/error），
+   必须通过 -Wall -Werror -std=gnu99；不要引入浮点、递归或全局构造。
+
+【输出】
+两个文件的完整内容，并说明：为什么对象指针可以按页对齐反推出 slab 头，
+以及 freelist 嵌在对象内部的做法有什么代价。
+````
+
+**Prompt 2：为 SLUB 生成测试**
+
+````markdown
+【背景】
+kern/mm/slub.c 已实现。pmm_init() 已完成，页层可用；测试要在内核里跑，失败即 panic。
+
+【任务】
+写 void slub_self_test(void)，用断言验证对象层，最后打印一行 PASS。
+
+【必须覆盖】
+1. 边界：slub_alloc(0) 与 slub_alloc(2049) 必须返回 NULL；
+2. 分级：1 / 24 / 200 字节分别应落在 8 / 32 / 256 字节级，返回地址 8 字节对齐；
+3. 独立性：三个对象互不重叠，写入不同图案后逐字节读回一致；
+4. 跨 slab：连续分配 128 个 128 字节对象（一页只放得下 31 个），要求全部非空、
+   两两不同、地址对齐，并在每个对象里写入编号后读回；
+5. 复用：全部释放后再分配一次，必须成功；
+6. 最大级：slub_alloc(2048) 成功并可写满 2048 字节；
+7. 非法指针：slub_free(NULL) 必须返回 E_INVAL。
+
+【输出】
+完整函数，并说明这些用例分别能发现哪类错误（分级算错、freelist 断链、slab 复用
+时没清元数据、越界写等）。
+````
+
+#### 测试与验证
+
+`make ctest` 输出 `[Test C2] SLUB: PASS`，覆盖情况见下表：
+
+| 用例 | 覆盖的行为 | 为什么能发现错误 |
+|------|-----------|------------------|
+| `slub_alloc(0)` / `(2049)` | 边界与越界 | 分级函数写错会返回非 NULL |
+| 1 / 24 / 200 字节 | 向上取整 | 落错级别会导致对象区大小与对象数不符 |
+| 三对象互写互读 | 不重叠 | freelist 串错会让两个对象指向同一地址 |
+| 128×128B | 跨 slab 与增长 | 一页 31 个，必然触发多次 `slub_grow` |
+| 全部释放后再分配 | 复用与回收 | slab 回收时元数据未清会立刻出错 |
+| `slub_free(NULL)` | 入参校验 | 未判空会直接解引用 |
+
+#### 与 Linux SLUB 的差异、改进空间
+
+1. **没有 per-CPU 缓存**：Linux 每 CPU 有自己的 current slab，分配多数情况无锁；
+   本实现全部走同一条 `partial` 链表，多核下必须加锁。
+2. **没有 slab 着色（coloring）**：Linux 通过偏移对象区起点让不同 slab 的对象落在
+   不同 cache line，减少伪共享；本实现所有 slab 布局完全相同。
+3. **size class 粒度粗**：只有 9 级，128 字节的请求会占 128 字节（合适），
+   但 130 字节的请求要占 256 字节；可以增加级数或按 2 的幂 + 中间档细分。
+4. **没有构造函数/析构函数**，也不支持 `krealloc`、`kzalloc` 之外的语义；
+   可以在 `struct slub_cache` 里挂 `ctor` 指针来扩展。
+5. **回收策略简单**：只在“整个 slab 都空且该级还有别的 slab”时归还页，
+   可以改为维护 `cpu_partial` 阈值，批量归还以降锁竞争。
+
+---
+
+#### 附：实现过程中由测试发现的 bug
+
+1. **Buddy 合并后计数翻倍**：最初只在合并结束时把合并块加进全局 `buddy_nr_free`，
+   忘记在合并时把伙伴块减掉，导致一次“分配 1 页 + 释放 1 页”后空闲页数从 1024 变成 2047。
+   `buddy_check()` 里 `assert(total == buddy_nr_free)` 直接定位到问题，修正为
+   “合并时先减、最后插入时再加”。
+2. **QEMU 启动参数**：`-device loader,file=...,addr=0x80200000` 在本机 QEMU 7.0 /
+   OpenSBI 0.9 下只把镜像放进内存，固件的 `Domain0 Next Address` 仍是 0，内核从未执行，
+   `make grade` 恒为 0 分；改为 `-kernel bin/ucore.img` 后正常启动（与 lab1 的修法一致）。
+3. **评分脚本的时序**：`grade.sh` 依赖 `ulimit -t` 事后杀掉 QEMU，冷启动时串口日志还没
+   flush，检查必然读不到 PASS；改为轮询等待 `[Test` 出现（最多 60s）后再结束 QEMU。
+
+---
+
 ## 五、测试与验证
 
 <!-- 根据该实验的具体情况，提供完整的测试运行截图，应包含：
@@ -153,6 +441,38 @@ OS 可以在启动时通过固件或引导程序提供的硬件信息获取可�
 -->
 
 **测试截图：**
+
+> 下面先贴出实际运行日志，截图见 `./images/test_result.png`（运行 `make qemu`、`make ctest`、
+> `make grade` 后截图放入即可）。
+
+`make grade`（官方评分，注入 `tools/test_lab2.c` 后运行 QEMU）：
+
+```
+  -check page init:                          OK
+  -check best fit:                           OK
+
+Total Score: 20/20
+```
+
+`make ctest`（成员 C 自测，`-DLAB2_C_TEST`）：
+
+```
+memory management: best_fit_pmm_manager
+check_alloc_page() succeeded!
+[Test C1] Buddy System: begin
+[Test C1]   region @0x80400000, 1024 pages
+buddy_check() succeeded!
+buddy_check() succeeded!
+buddy_check() succeeded!
+buddy_check() succeeded!
+buddy_check() succeeded!
+buddy_check() succeeded!
+[Test C1] Buddy System: PASS
+[Test C2] SLUB: begin
+[Test C2] SLUB: PASS
+satp virtual address: 0xffffffffc0206000
+satp physical address: 0x0000000080206000
+```
 
 ![测试结果截图](./images/test_result.png)
 

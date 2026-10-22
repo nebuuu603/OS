@@ -14,8 +14,8 @@
 | 5 | SLUB 对象分配器 | ✅ 已实现 | `kern/mm/slub.{c,h}` |
 | 6 | SLUB 自测 | ✅ 通过 | `make ctest` → `[Test C2] SLUB: PASS` |
 | 7 | 集成到内核（不影响官方评分） | ✅ 完成 | 默认构建 `make grade` 仍 20/20 |
-| 8 | 报告章节（功能模块三 + Challenge） | ⬜ 待写 | 见第 7 节 |
-| 9 | 运行截图 / 报告图片 | ⬜ 待补 | `report/images/` |
+| 8 | 报告章节（功能模块三 + Challenge） | ✅ 完成 | `report.md` 中「Buddy System」「SLUB」两节 |
+| 9 | 运行截图 / 报告图片 | ⬜ 待补 | `report/images/test_result.png`（需本人在终端截图） |
 
 ## 1. 成员 A / B 的实现核对
 
@@ -123,17 +123,17 @@ make qemu      # 普通启动
 `make ctest` 通过 `CFLAGS3 = $(CFLAGS) -D LAB2_C_TEST` 编译，`pmm_init()` 末尾调用
 `lab2_c_self_test()`；默认构建不定义该宏，自测代码不会执行，因此不影响官方评分。
 
-## 7. 报告待写章节
+## 7. 报告章节（已写入 `report.md`）
 
 1. **功能模块三：Buddy System**（任务三）
    - 两份 prompt：① 生成分配模块并接入内核；② 为它生成测试
-   - 测试覆盖说明与有效性论证（可直接用第 5 节表格）
+   - 测试覆盖说明与有效性论证（与第 5 节表格一致）
 2. **Challenge：SLUB**（选做加分）
    - 两份 prompt：① 生成 SLUB 模块；② 生成测试
    - 设计说明、测试覆盖、与 Linux SLUB 的差异
 3. **改进空间**（练习要求回答）：Buddy 可用位图/多级位图降低内存开销、按 CPU 分桶；
    SLUB 可加 per-CPU 缓存、对象构造函数、slab 着色、更细的 size class。
-4. **AI 协作 bug 记录**：本次实际踩到的坑可作为素材——
+4. **AI 协作 bug 记录**：本次实际踩到的坑已作为素材写入报告附录——
    - `-device loader` 在 OpenSBI 0.9 下不设置跳转地址，内核根本没跑（0/20 的根因）
    - `grade.sh` 依赖 `ulimit -t` 事后杀 QEMU，冷启动时日志为空
    - Buddy 合并时只减分级计数、没减全局计数，`buddy_check()` 断言失败
@@ -157,7 +157,7 @@ git reset --hard c-buddy-slub        # 回到"Buddy+SLUB 已验证"的检查点
 
 ## 9. 待办与风险
 
-- [ ] 报告两节 + prompt 文本（第 7 节）
+- [x] 报告两节 + prompt 文本（第 7 节，已写入 `report.md`）
 - [ ] `make qemu` / `make ctest` / `make grade` 截图放入 `report/images/`
 - [ ] 与 A、B 确认：`page_init` 是否补 `physical memory map` 打印（涉及 A 的文件，需其同意）
 - [ ] 提交前确认代码里保留 `lab2` 注释、`YOUR CODE` 已按老师要求替换为学号
