@@ -580,6 +580,8 @@ satp physical address: 0x0000000080205000
 | 分配自检 | `check_alloc_page() succeeded!` |
 | 启动页表 | `satp` 虚拟 `0xffffffffc0205000`、物理 `0x80205000` |
 
+内核初始化结束后进入 `while (1)` 无限循环，因此日志末尾的 `terminating on signal 15` 与 `make: *** Error 124` 是测试脚本到时关闭 QEMU 的记录，不是内核崩溃或编译失败。
+
 ### 5.2 官方评分
 
 `make grade` 会在临时副本中注入 `tools/test_lab2.c`，重新编译后在 QEMU 中运行，匹配两行 PASS：
@@ -610,7 +612,7 @@ satp virtual address: 0xffffffffc0206000
 satp physical address: 0x0000000080206000
 ```
 
-完整日志见 [logs/ctest-output.txt](logs/ctest-output.txt)。
+完整日志见 [logs/ctest-output.txt](logs/ctest-output.txt)。`make ctest` 结束时同样因为 QEMU 被 `timeout` 关闭而返回 `Error 124/2`，自测本身已在此之前输出 PASS。
 
 ### 5.4 截图与日志附件
 
