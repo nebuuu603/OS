@@ -35,6 +35,7 @@ CFLAGS	+= -fno-builtin -Wall -O2 -nostdinc $(DEFS)
 CFLAGS	+= -fno-stack-protector -ffunction-sections -fdata-sections
 CFLAGS	+= -g
 CFLAGS2 = $(CFLAGS) -D ucore_test
+CFLAGS3 = $(CFLAGS) -D LAB2_C_TEST
 CTYPE	:= c S
 LD      := $(GCCPREFIX)ld
 LDFLAGS	:= -m elf64lriscv
@@ -67,6 +68,7 @@ listf_cc = $(call listf,$(1),$(CTYPE))
 # for cc
 add_files_cc = $(call add_files,$(1),$(CC),$(CFLAGS) $(3),$(2),$(4))
 add_files_cc2 = $(call add_files,$(1),$(CC),$(CFLAGS2) $(3),$(2),$(4))
+add_files_cc3 = $(call add_files,$(1),$(CC),$(CFLAGS3) $(3),$(2),$(4))
 create_target_cc = $(call create_target,$(1),$(2),$(3),$(CC),$(CFLAGS))
 
 # for hostcc
@@ -111,6 +113,8 @@ KCFLAGS		+= $(addprefix -I,$(KINCLUDE))
 
 ifeq ($(MAKECMDGOALS),test)
 $(call add_files_cc2,$(call listf_cc,$(KSRCDIR)),kernel,$(KCFLAGS))
+else ifeq ($(MAKECMDGOALS),ctest)
+$(call add_files_cc3,$(call listf_cc,$(KSRCDIR)),kernel,$(KCFLAGS))
 else
 $(call add_files_cc,$(call listf_cc,$(KSRCDIR)),kernel,$(KCFLAGS))
 endif
@@ -159,7 +163,7 @@ endif
 TARGETS: $(TARGETS)
 
 .DEFAULT_GOAL := TARGETS
-.PHONY: qemu spike test
+.PHONY: qemu spike test ctest
 qemu: $(UCOREIMG) $(SWAPIMG) $(SFSIMG)
 	$(V)$(QEMU) \
 		-machine virt \
@@ -182,6 +186,14 @@ gdb:
     -ex 'target remote localhost:1234'
 
 test: $(UCOREIMG) $(SWAPIMG) $(SFSIMG)
+	$(V)$(QEMU) \
+		-machine virt \
+		-nographic \
+		-bios default \
+		-kernel $(UCOREIMG)
+
+# lab2 成员 C：带 Buddy System / SLUB 自测的构建与运行
+ctest: $(UCOREIMG) $(SWAPIMG) $(SFSIMG)
 	$(V)$(QEMU) \
 		-machine virt \
 		-nographic \

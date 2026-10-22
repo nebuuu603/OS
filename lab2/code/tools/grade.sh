@@ -150,10 +150,10 @@ run_qemu() {
         # NOTE(local): in this lab nothing stops QEMU, and the harness used to
         # rely on `ulimit -t` killing it long after the checks had already run,
         # which left the serial log empty on a cold VM.  Wait until the last
-        # check prints (up to 15s) instead of guessing a fixed delay, then stop
+        # check prints (up to 60s, a cold WSL VM can be slow) and then stop
         # QEMU so the chardev is flushed.
         i=0
-        while [ $i -lt 150 ]; do
+        while [ $i -lt 600 ]; do
             if $grep -q '\[Test' "$qemu_out" 2>/dev/null; then
                 sleep 1
                 break

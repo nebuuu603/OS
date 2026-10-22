@@ -11,6 +11,10 @@
 #include <riscv.h>
 #include <dtb.h>
 
+#ifdef LAB2_C_TEST
+#include <lab2_c_test.h>
+#endif
+
 // virtual address of physical page array
 struct Page *pages;
 // amount of physical memory (in pages)
@@ -187,6 +191,11 @@ void pmm_init(void) {
 
     // use pmm->check to verify the correctness of the alloc/free function in a pmm
     check_alloc_page();
+
+#ifdef LAB2_C_TEST
+    // lab2 成员 C：Buddy System / SLUB 自测，默认构建不会包含
+    lab2_c_self_test();
+#endif
 
     extern char boot_page_table_sv39[];
     satp_virtual = (pte_t*)boot_page_table_sv39;
