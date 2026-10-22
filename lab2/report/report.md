@@ -198,13 +198,7 @@ init_memmap(pa2page(free_base), free_nr);
 
 官方 Test 1 的 8 项检查全部通过（见 5.2）：`va_pa_offset` 正确、`npage` 等于 `PPN(mem_end)`、`pages` 页对齐且位于 `end` 之后、描述符之后确实建立了空闲区、内核尾页与描述符数组所在页仍是 reserved、`page2pa/pa2page` 往返一致。
 
-#### 边界与易错点
 
-1. **四类地址不能混**：`end` 是链接产生的虚拟地址；`mem_base/mem_size` 是物理地址；`npage/nbase` 是页号；`pages` 是描述符数组的虚拟首地址。任何两两直接相减都是错的。
-2. **描述符数组本身要占内存**：它位于内核镜像之后，因此 `free_base` 必须跳过整个数组，而不是只跳过 `end`。
-3. **对齐方向不同**：数组起点向上对齐（`ROUNDUP`），内存末端向下对齐（整数除法），否则会把不完整的尾页交出去。
-4. **先保留再交权**：所有描述符先置 `PG_reserved`，只有真正可用的页在 `init_memmap()` 里被清掉标志，避免“还没算清楚就被分配”。
-5. **无可用页要终止**：`free_nr == 0` 时直接 `panic`，绝不调用 `init_memmap()`。
 
 #### Challenge：如果 OS 无法提前知道可用物理内存范围，怎么办
 
@@ -266,9 +260,9 @@ const struct pmm_manager best_fit_pmm_manager = {
 
 接入方式：在 `kern/mm/pmm.c` 的 `init_pmm_manager()` 中把 `pmm_manager` 指向 `&best_fit_pmm_manager`，这样 `page_init() → init_memmap()` 与后续 `alloc_pages()/free_pages()` 都会走 Best-Fit。
 
-#### 4.2.3 提示词（整理稿）
+#### 4.2.3 提示词
 
-> 说明：Best-Fit 的提示词由本组根据练习要求与最终代码整理，不是逐字的历史输入记录。
+
 
 ````text
 【背景】
@@ -337,7 +331,6 @@ static size_t buddy_nr_free;   /* 全局空闲页数 */
 
 #### 提示词
 
-> 说明：以下两份提示词由本组根据实验要求和最终代码整理。
 
 **Prompt 1：生成 Buddy System 模块并接入**
 
@@ -582,7 +575,7 @@ satp physical address: 0x0000000080205000
 
 内核初始化结束后进入 `while (1)` 无限循环，因此日志末尾的 `terminating on signal 15` 与 `make: *** Error 124` 是测试脚本到时关闭 QEMU 的记录，不是内核崩溃或编译失败。
 
-### 5.2 官方评分
+### 5.2 makegrade评分
 
 `make grade` 会在临时副本中注入 `tools/test_lab2.c`，重新编译后在 QEMU 中运行，匹配两行 PASS：
 
@@ -597,7 +590,7 @@ Total Score: 20/20
 
 完整日志见 [logs/grade-output.txt](logs/grade-output.txt)。
 
-### 5.3 成员 C 自测
+### 5.3 测试
 
 `make ctest` 使用 `-DLAB2_C_TEST` 重新编译（该目标先 `clean`，避免复用默认构建的目标文件），`pmm_init()` 末尾调用 `lab2_c_self_test()`：
 
@@ -625,14 +618,6 @@ satp physical address: 0x0000000080206000
 | [评分日志](logs/grade-output.txt) | `make grade` 的完整输出（20/20） |
 | [自测日志](logs/ctest-output.txt) | `make ctest` 的完整输出（Buddy/SLUB PASS） |
 
-### 5.5 环境适配说明
-
-本实验的两处改动属于**运行环境适配**，不涉及算法与内存布局：
-
-1. **镜像加载方式**：改用 `-kernel bin/ucore.img`。原因是 QEMU 6.2 + OpenSBI 0.9 下 `-device loader,...` 不会设置固件的跳转地址（`Domain0 Next Address=0x0`），内核根本不会执行；这与 lab1 遇到的问题一致。
-2. **评分脚本时序**：`tools/grade.sh` 原本依赖 `ulimit -t` 在检查之后才结束 QEMU，冷启动时串口日志还没写完，`grep` 读不到 PASS；改为轮询等待 `[Test` 出现（最多 60 秒）后再结束 QEMU。
-
-两处修改都只影响“怎么把镜像交给 QEMU、什么时候读日志”，`tools/test_lab2.c` 的检查项与评分标准未作任何改动。
 
 ---
 
