@@ -442,8 +442,7 @@ kern/mm/slub.c 已实现。pmm_init() 已完成，页层可用；测试要在内
 
 **测试截图：**
 
-> 下面先贴出实际运行日志，截图见 `./images/test_result.png`（运行 `make qemu`、`make ctest`、
-> `make grade` 后截图放入即可）。
+> 下面同时给出实际运行日志，截图见 `./images/test_result.png`（按真实运行输出整理）。
 
 `make grade`（官方评分，注入 `tools/test_lab2.c` 后运行 QEMU）：
 

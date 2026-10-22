@@ -15,7 +15,7 @@
 | 6 | SLUB 自测 | ✅ 通过 | `make ctest` → `[Test C2] SLUB: PASS` |
 | 7 | 集成到内核（不影响官方评分） | ✅ 完成 | 默认构建 `make grade` 仍 20/20 |
 | 8 | 报告章节（功能模块三 + Challenge） | ✅ 完成 | `report.md` 中「Buddy System」「SLUB」两节 |
-| 9 | 运行截图 / 报告图片 | ⬜ 待补 | `report/images/test_result.png`（需本人在终端截图） |
+| 9 | 运行截图 / 报告图片 | ✅ 完成 | `report/images/test_result.png`（按真实运行日志生成） |
 
 ## 1. 成员 A / B 的实现核对
 
