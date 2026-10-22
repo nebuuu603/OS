@@ -146,6 +146,23 @@ run_qemu() {
         ) > $gdb_in
         $gdb -batch -nx -x $gdb_in > /dev/null 2>&1
         kill $pid > /dev/null 2>&1
+    else
+        # NOTE(local): in this lab nothing stops QEMU, and the harness used to
+        # rely on `ulimit -t` killing it long after the checks had already run,
+        # which left the serial log empty on a cold VM.  Wait until the last
+        # check prints (up to 15s) instead of guessing a fixed delay, then stop
+        # QEMU so the chardev is flushed.
+        i=0
+        while [ $i -lt 150 ]; do
+            if $grep -q '\[Test' "$qemu_out" 2>/dev/null; then
+                sleep 1
+                break
+            fi
+            sleep 0.1
+            i=`expr $i + 1`
+        done
+        kill $pid > /dev/null 2>&1
+        wait $pid 2>/dev/null
     fi
 }
 
