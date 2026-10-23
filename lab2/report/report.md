@@ -671,3 +671,96 @@ satp physical address: 0x0000000080206000
 | [member-c-plan.md](member-c-plan.md) | 成员 C 的任务拆解、测试矩阵与 git 工作流 |
 | [logs/](logs/) | 环境记录与三份运行日志 |
 | [images/test_result.png](images/test_result.png) | `make grade` / `make ctest` 结果图 |
+
+<!-- LAB2_VERIFICATION_20261023_BEGIN -->
+## 调试验证记录（2026-10-23）
+
+### 验证环境与代码版本
+
+本次验证在 Windows 的 WSL Ubuntu 22.04 中进行，使用 RISC-V 交叉编译工具链和 QEMU Virt Machine。启动信息显示 OpenSBI v0.4、128 MiB 物理内存，设备树报告内存起点为 `0x80000000`，末端排他地址为 `0x88000000`。验证开始时，本地 `main` 与 `origin/main` 均指向提交 `602690a`。
+
+### 官方评分检查
+
+在 `lab2/code` 目录执行 `make grade`，编译和评分均正常完成，结果如下：
+
+```text
+-check page init: OK
+-check best fit:  OK
+Total Score: 20/20
+```
+
+该结果确认实验评分中的物理页初始化和 Best-Fit 检查通过。Buddy、SLUB 文件参与编译不代表其行为自测已经运行，因此另行执行扩展测试。
+
+![官方评分结果](./images/verification-grade-20261023.png)
+
+### Buddy System 与 SLUB 扩展自测
+
+执行 `make ctest`。该入口先清理旧目标文件，再使用 `LAB2_C_TEST` 编译选项构建内核，在启动过程中依次调用 `buddy_self_test()` 和 `slub_self_test()`。实际输出为：
+
+```text
+check_alloc_page() succeeded!
+[Test C1] Buddy System: begin
+[Test C1]   region @0x80400000, 1024 pages
+buddy_check() succeeded!
+[Test C1] Buddy System: PASS
+[Test C2] SLUB: begin
+[Test C2] SLUB: PASS
+```
+
+运行中多次输出 `buddy_check() succeeded!`，上面仅保留一行作为摘要。
+
+#### Buddy 自测覆盖与有效性
+
+| 检查内容 | 测试方式及其验证作用 |
+| --- | --- |
+| 初始化与最小分配 | 初始化 1024 页测试区，申请 1 页，检查返回范围、块首空闲标记、引用计数和空闲页数。 |
+| 非二次幂请求 | 申请 3 页后检查空闲总数累计减少 5 页，验证该请求实际占用 4 页，加上此前申请的 1 页。 |
+| 空间不足 | 已有分配未释放时，申请整个 1024 页区域应返回 NULL。 |
+| 释放与逐级合并 | 释放 3 页请求和 1 页请求后检查空闲计数恢复，再申请整个 1024 页并检查返回原区域起点；整区重新申请能够检验释放块是否重新合并为可用大块。 |
+| 耗尽与回收 | 整区分配后空闲计数为 0，额外申请 1 页失败；释放整区后计数恢复。 |
+| 与当前管理器配合 | 自测从当前物理内存管理器申请 2048 页，在其中选择对齐的 1024 页测试区；结束时清理描述符状态，并将原申请区域归还。 |
+
+本次普通内核仍选择 `best_fit_pmm_manager`。Buddy 在从 Best-Fit 申请的独立区域中接受测试，本次结果不表示已经将 Buddy 切换为整个内核的默认分配器。自测未明确覆盖地址相邻但不互为伙伴的专门反例、随机分配序列或错误释放参数，报告不将这些列为已验证内容。
+
+#### SLUB 自测覆盖与有效性
+
+| 检查内容 | 测试方式及其验证作用 |
+| --- | --- |
+| 请求边界 | 0 字节及超过 `SLUB_MAX_OBJECT` 的请求返回 NULL；最大允许大小可成功申请、写入和释放。 |
+| 对象大小分类 | 分别申请 1、24、200 字节对象，检查申请成功，覆盖多个对象大小类别。 |
+| 数据完整性 | 向对象写入不同字节模式后逐字节读回，检查被测对象之间没有出现写入干扰。 |
+| 多 slab 与对齐 | 批量申请 128 字节对象，检查 slab 数至少为 2，检查地址满足 `SLUB_ALIGN` 对齐，并逐对检查返回地址不同。 |
+| 批量释放 | 为批量对象写入序号，释放前读回检查，再逐个确认释放返回成功。 |
+| 释放后再次申请 | 批量释放后再次申请和释放 128 字节对象成功，验证释放后仍能继续提供对象。 |
+| 空指针释放 | `slub_free(NULL)` 返回 `E_INVAL`。 |
+
+上述测试未检查释放前后底层物理空闲页总数是否恢复，因此不能据此断言所有 slab 页面都已归还底层分配器。重复释放、非法指针释放、所有大小类别边界及资源耗尽后的状态一致性也不属于当前截图所示自测的已确认覆盖范围。
+
+![Buddy 与 SLUB 扩展自测结果](./images/verification-ctest-20261023.png)
+
+### 恢复普通构建并检查启动
+
+扩展测试结束后退出 QEMU，执行：
+
+```bash
+make clean
+make qemu
+```
+
+清理是为了避免普通构建复用带有 `LAB2_C_TEST` 选项的目标文件。普通内核启动后输出：
+
+```text
+memory management: best_fit_pmm_manager
+check_alloc_page() succeeded!
+satp virtual address: 0xffffffffc0205000
+satp physical address: 0x0000000080205000
+```
+
+本次普通启动没有出现 `[Test C1]`、`[Test C2]`，与普通构建未启用扩展自测的预期一致。使用 `Ctrl+A` 后按 `X` 主动退出 QEMU，随后执行 `git status --short` 没有输出，确认验证结束时工作区干净。终端中的 `QEMU: Terminated` 为主动退出信息。
+
+![恢复普通启动与工作区检查](./images/verification-normal-20261023.png)
+
+### 验证结论
+
+本次官方评分为 20/20，Buddy 与 SLUB 现有自测均显示 PASS，清理后普通内核仍能正常启动并通过 Best-Fit 自检。验证过程中未发现编译错误、断言失败或内核 panic。结论限定于上述测试覆盖的行为；本次未执行 GDB 单步调试，也未将未执行的边界或压力测试列为通过项。
+<!-- LAB2_VERIFICATION_20261023_END -->
