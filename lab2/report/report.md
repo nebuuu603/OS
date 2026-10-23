@@ -213,7 +213,7 @@ init_memmap(pa2page(free_base), free_nr);
 
 
 
-#### Challenge：如果 OS 无法提前知道可用物理内存范围，怎么办
+#### Challenge：如果 OS 无法提前知道可用物理内存范围，怎么办(思考题)
 
 1. **固件/引导协议递交**：本实验就是这种方式——启动链通过 DTB 向内核提供 `memory` 节点，内核据此解析内存信息；x86 上对应 BIOS `e820`、UEFI Memory Map 或 multiboot 的内存表。
 2. **探测硬件寄存器**：若固件没有给内存表，但 OS 知道内存控制器/DRAM 控制器的编程接口，可以读容量寄存器或 SPD 信息得到大小。
@@ -226,7 +226,7 @@ init_memmap(pa2page(free_base), free_nr);
 
 ### 4.2 功能模块二：连续物理内存分配（于子朔）
 
-#### 4.2.1 First-Fit 阅读分析（思考题）
+#### 4.2.1 理解First-Fit分配算法 （思考题）
 
 `kern/mm/default_pmm.c` 用一条按物理地址升序的空闲块链表管理内存，块头页的 `property` 记录块长度，`PG_property` 标记“这是空闲块头”。
 
