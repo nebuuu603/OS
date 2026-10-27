@@ -56,7 +56,48 @@
 
     .macro RESTORE_ALL
 
-    #lab3 function1 YOUR CODE
+    #lab3 function1 2411843
+    # Restore the privileged state before returning from the trap.
+    LOAD t0, 32*REGBYTES(sp)
+    csrw sstatus, t0
+    LOAD t0, 33*REGBYTES(sp)
+    csrw sepc, t0
+
+    # Restore the saved integer registers. x0 is hard-wired to zero.
+    LOAD x1, 1*REGBYTES(sp)
+    LOAD x3, 3*REGBYTES(sp)
+    LOAD x4, 4*REGBYTES(sp)
+    LOAD x5, 5*REGBYTES(sp)
+    LOAD x6, 6*REGBYTES(sp)
+    LOAD x7, 7*REGBYTES(sp)
+    LOAD x8, 8*REGBYTES(sp)
+    LOAD x9, 9*REGBYTES(sp)
+    LOAD x10, 10*REGBYTES(sp)
+    LOAD x11, 11*REGBYTES(sp)
+    LOAD x12, 12*REGBYTES(sp)
+    LOAD x13, 13*REGBYTES(sp)
+    LOAD x14, 14*REGBYTES(sp)
+    LOAD x15, 15*REGBYTES(sp)
+    LOAD x16, 16*REGBYTES(sp)
+    LOAD x17, 17*REGBYTES(sp)
+    LOAD x18, 18*REGBYTES(sp)
+    LOAD x19, 19*REGBYTES(sp)
+    LOAD x20, 20*REGBYTES(sp)
+    LOAD x21, 21*REGBYTES(sp)
+    LOAD x22, 22*REGBYTES(sp)
+    LOAD x23, 23*REGBYTES(sp)
+    LOAD x24, 24*REGBYTES(sp)
+    LOAD x25, 25*REGBYTES(sp)
+    LOAD x26, 26*REGBYTES(sp)
+    LOAD x27, 27*REGBYTES(sp)
+    LOAD x28, 28*REGBYTES(sp)
+    LOAD x29, 29*REGBYTES(sp)
+    LOAD x30, 30*REGBYTES(sp)
+    LOAD x31, 31*REGBYTES(sp)
+
+    # Restore sp last. The load address uses the old sp (the tf base) before
+    # the loaded value writes back to sp.
+    LOAD sp, 2*REGBYTES(sp)
 
     .endm
 
@@ -65,8 +106,14 @@
 __alltraps:
     SAVE_ALL
 
-    #lab3 function1 YOUR CODE
+    #lab3 function1 2411843
     # sp should be the same as before "jal trap"
+
+    # trap(struct trapframe *tf): the frame starts at the current sp.
+    mv a0, sp
+    call trap
+    # The RISC-V calling convention requires trap() to preserve sp, so it
+    # still points to the saved frame here.
 
     .globl __trapret
 __trapret:
