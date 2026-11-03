@@ -61,10 +61,16 @@ bootstacktop:
     .global boot_page_table_sv39
 # 分配 4KiB 内存给预设的三级页表
 boot_page_table_sv39:
-    # 0xffffffff_c0000000 map to 0x80000000 (1G)
-    # 前 511 个页表项均设置为 0 ，因此 V=0 ，意味着是空的(unmapped)
-    .zero 8 * 511
-    # 设置最后一个页表项，PPN=0x80000，标志位 VRWXAD 均为 1
+    # 前两个页表项为空，保持低地址 0x00000000-0x7fffffff 不映射
+    .zero 8 * 2
+    # 第 3 个页表项：恒等映射 0x80000000-0xbfffffff。
+    # 开启 satp 后，紧接着的一条指令仍在物理地址 0x802000xx 处取指，
+    # 若没有这个恒等映射，它会在跳到高虚拟地址之前先触发 instruction page fault。
+    .quad (0x80000 << 10) | 0xcf # VRWXAD
+    # 其余页表项为空
+    .zero 8 * 508
+    # 设置最后一个页表项，将 0xffffffff_c0000000 映射到 0x80000000 (1G)，
+    # PPN=0x80000，标志位 VRWXAD 均为 1
     .quad (0x80000 << 10) | 0xcf # VRWXAD
 
     .global boot_hartid

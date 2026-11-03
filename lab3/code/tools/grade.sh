@@ -30,9 +30,12 @@ run_case() {
     fi
 
     echo "Running $label..."
+    # NOTE(local): -device loader leaves OpenSBI's next address at 0, so the
+    # kernel never starts.  -kernel loads the raw image at 0x80200000 and sets
+    # the firmware jump target there.
     timeout "${seconds}s" qemu-system-riscv64 \
         -machine virt -nographic -bios default \
-        -device loader,file=bin/ucore.img,addr=0x80200000 \
+        -kernel bin/ucore.img \
         -serial file:"$output" -monitor none -no-reboot >/dev/null 2>&1 || true
 
     passed=1

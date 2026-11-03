@@ -44,7 +44,9 @@
     csrrw s0, sscratch, x0
     csrr s1, sstatus
     csrr s2, sepc
-    csrr s3, sbadaddr
+    # The current toolchain only knows the v1.10 name stval; it is the same
+    # CSR that older documents call sbadaddr.
+    csrr s3, stval
     csrr s4, scause
 
     STORE s0, 2*REGBYTES(sp)

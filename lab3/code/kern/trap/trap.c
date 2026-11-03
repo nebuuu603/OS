@@ -144,6 +144,49 @@ void interrupt_handler(struct trapframe *tf) {
     }
 }
 
+/* *
+ * trap_insn_length - length in bytes of the instruction that caused a trap.
+ * RISC-V uses the two low bits to distinguish 16-bit compressed instructions
+ * (low bits != 0b11) from 32-bit instructions (low bits == 0b11).  ebreak is
+ * encoded as the compressed c.ebreak here, so a hard-coded "+ 4" would resume
+ * in the middle of the following instruction.
+ * */
+static uintptr_t trap_insn_length(uintptr_t epc) {
+    uint16_t insn = *(const uint16_t *)epc;
+    return (insn & 0x3) == 0x3 ? 4 : 2;
+}
+
+//lab3 function3 2412855
+void exception_handler(struct trapframe *tf) {
+    switch (tf->cause) {
+    case CAUSE_ILLEGAL_INSTRUCTION:
+        cprintf("Illegal instruction at 0x%016lx\n", (unsigned long)tf->epc);
+        /* Resume after the illegal instruction instead of re-executing it. */
+        tf->epc += trap_insn_length(tf->epc);
+        break;
+
+    case CAUSE_BREAKPOINT:
+        cprintf("Breakpoint at 0x%016lx\n", (unsigned long)tf->epc);
+        /* Skip ebreak (2 or 4 bytes) and return to the next instruction. */
+        tf->epc += trap_insn_length(tf->epc);
+        break;
+
+    default:
+        print_trapframe(tf);
+        /*
+         * An unexpected exception taken in kernel mode cannot be resumed
+         * safely, so report it and stop.  While the kernel still runs without
+         * user processes, a frame marked as user mode (SPP == 0) is only
+         * reported and then returned to its caller; this also keeps the
+         * exception fallback path testable.
+         */
+        if (trap_in_kernel(tf)) {
+            panic("Unexpected exception in kernel, cause %d", (int)tf->cause);
+        }
+        break;
+    }
+}
+
 static inline void trap_dispatch(struct trapframe *tf) {
     if ((intptr_t)tf->cause < 0) {
         // interrupts
