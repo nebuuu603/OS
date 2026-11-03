@@ -89,7 +89,7 @@
 RISC-V Supervisor 模式下，Trap（中断或异常）发生时硬件会自动：
 1. 保存当前 PC 到 sepc
 2. 保存 Trap 原因到 scause
-3. 保存出错地址（若适用）到 sbadaddr  
+3. 保存出错地址到 sbadaddr  
 4. 更新 sstatus 中的相关位（SPP、SPIE 等）
 5. 跳转到 stvec 指定的处理入口（即 __alltraps）
 
