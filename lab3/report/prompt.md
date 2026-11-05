@@ -21,7 +21,7 @@ __alltraps：SAVE_ALL 之后 mv a0, sp，call trap；返回后顺序执行 __tra
 使用 riscv.h 的 LOAD 宏；严格按上述布局；不修改 SAVE_ALL、struct trapframe 和 trap() 定义
 
 [OUTPUT]
-生成完整的 RESTORE_ALL 宏定义和 __alltraps 函数中 #lab3 function1 标记后的代码。
+生成完整的 RESTORE_ALL 宏定义和 __alltraps 函数中 #lab3 function1 标记后的代码
 ````
 
 #### 功能模块二提示词
