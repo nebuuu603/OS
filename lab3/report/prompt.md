@@ -42,3 +42,27 @@ __alltraps：SAVE_ALL 之后 mv a0, sp，call trap；返回后顺序执行 __tra
 请先检查项目已有宏、接口和输出风格，再给出最小实现，并说明计数边界和关机路径。
 ```
 
+
+#### 功能模块三提示词
+
+````text
+[PROMPT] 实现 kern/trap/trap.c 中的 exception_handler(struct trapframe *tf)，正确处理非法指令、断点和其他异常，并保证 Trap 返回位置正确。
+
+[CONTEXT]
+汇编入口已经保存处理器上下文，并通过 kern/trap/trap.h 中的 struct trapframe 把 Trap 信息传给 trap(struct trapframe *tf)。tf->cause 保存 scause 的异常原因码，tf->epc 保存触发异常的指令地址，tf->status 保存陷入前的 sstatus。kern/trap/trap.c 已有 print_trapframe(tf) 和 trap_in_kernel(tf) 可用；libs/riscv.h 定义了 CAUSE_ILLEGAL_INSTRUCTION 和 CAUSE_BREAKPOINT。
+
+[TASK]
+实现：
+void exception_handler(struct trapframe *tf);
+
+1. 当 tf->cause == CAUSE_ILLEGAL_INSTRUCTION 时，输出包含 "Illegal instruction at" 及 tf->epc 的诊断信息，然后根据该指令编码推进 tf->epc。
+2. 当 tf->cause == CAUSE_BREAKPOINT 时，输出包含 "Breakpoint at" 及 tf->epc 的诊断信息，然后根据断点指令编码推进 tf->epc。
+3. 对其他异常调用 print_trapframe(tf) 作为兜底；按本实验接口约定从处理函数正常返回，不修改未知异常的 EPC。
+4. 对本实验范围内的压缩和普通指令正确区分 2/4 字节长度，禁止对所有异常无条件固定加 4。
+
+[CONSTRAINTS]
+- 保持 exception_handler(struct trapframe *tf) 
+- 不修改 interrupt_handler()、trap_dispatch()、trap()、Trap frame 结构体、trapentry.S 或其他组员负责的代码。
+- 不修改中断处理逻辑和时钟计数。
+
+````

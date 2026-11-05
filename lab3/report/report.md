@@ -129,8 +129,6 @@ __alltraps：SAVE_ALL 之后 mv a0, sp，call trap；返回后顺序执行 __tra
 
 其他已定义的软件、timer 和外部中断分支输出对应类型提示；未知中断输出原因号并调用 `print_trapframe(tf)`。非时钟中断不会改变 tick 计数或 EPC。实现使用 `uintptr_t` 提取最高位中断标志，并以无符号长整数格式打印未知原因，避免把高位原因截断。
 
-本实现将 `TICK_NUM` 设为 100、`SHUTDOWN_AFTER` 设为 10，因此正常运行时累计 1000 次 supervisor timer 中断，打印 10 行统计信息后关机。模板中的 `DEBUG_GRADE` 行为仍保留：达到第一次统计输出时，按原样输出 `End of Test.` 并通过 `panic()` 结束对应评分用例。
-
 
 #### 提示词
 
@@ -157,28 +155,41 @@ __alltraps：SAVE_ALL 之后 mv a0, sp，call trap；返回后顺序执行 __tra
 
 `exception_handler()` 根据 `tf->cause` 处理非法指令异常和断点异常。处理时输出包含 EPC 的提示，并由 `trap_insn_length()` 检查指令低两位：低两位不为 `11` 时按 16 位压缩指令前进 2 字节，否则按本实验常见 32 位指令前进 4 字节。该处理可以避免返回后再次执行同一条非法指令或 `ebreak`。
 
-其他异常调用 `print_trapframe(tf)`。当前代码还对内核态未处理异常调用 `panic()`；这是额外的内核错误策略。若严格按指导书“其他异常只使用 Trap frame 兜底输出”的要求验收，应与组员确认是否保留该策略。提供的 fallback 测试使用 `status=0` 的模拟 frame，不覆盖内核态未知异常的 panic 分支。
 
 
 
 #### 提示词
 
-```text
-请检查并实现 kern/trap/trap.c 中 exception_handler(struct trapframe *tf)，遵守现有 trapframe、riscv.h 原因码和实验评分用例，不修改中断处理和 Trap 汇编入口。
+````text
+[PROMPT] 实现 kern/trap/trap.c 中的 exception_handler(struct trapframe *tf)，正确处理非法指令、断点和其他异常，并保证 Trap 返回位置正确。
 
-对 CAUSE_ILLEGAL_INSTRUCTION 与 CAUSE_BREAKPOINT，输出包含异常名称及 tf->epc 的信息，并在返回前推进 tf->epc，避免重复执行异常指令。根据 RISC-V 指令低位编码识别本实验涉及的 16 位压缩指令与 32 位指令，不要对所有异常固定增加相同偏移。其他异常调用 print_trapframe(tf) 兜底。
+[CONTEXT]
+汇编入口已经保存处理器上下文，并通过 kern/trap/trap.h 中的 struct trapframe 把 Trap 信息传给 trap(struct trapframe *tf)。tf->cause 保存 scause 的异常原因码，tf->epc 保存触发异常的指令地址，tf->status 保存陷入前的 sstatus。kern/trap/trap.c 已有 print_trapframe(tf) 和 trap_in_kernel(tf) 可用；libs/riscv.h 定义了 CAUSE_ILLEGAL_INSTRUCTION 和 CAUSE_BREAKPOINT。
 
-同时检查非法指令、普通 ebreak、压缩 ebreak、其他异常及评分测试构造的 Trap frame。说明 EPC 取指读取的有效地址前提，并指出任何超出实验范围的恢复策略。
-```
+[TASK]
+实现：
+void exception_handler(struct trapframe *tf);
+
+1. 当 tf->cause == CAUSE_ILLEGAL_INSTRUCTION 时，输出包含 "Illegal instruction at" 及 tf->epc 的诊断信息，然后根据该指令编码推进 tf->epc。
+2. 当 tf->cause == CAUSE_BREAKPOINT 时，输出包含 "Breakpoint at" 及 tf->epc 的诊断信息，然后根据断点指令编码推进 tf->epc。
+3. 对其他异常调用 print_trapframe(tf) 作为兜底；按本实验接口约定从处理函数正常返回，不修改未知异常的 EPC。
+4. 对本实验范围内的压缩和普通指令正确区分 2/4 字节长度，禁止对所有异常无条件固定加 4。
+
+[CONSTRAINTS]
+- 保持 exception_handler(struct trapframe *tf) 
+- 不修改 interrupt_handler()、trap_dispatch()、trap()、Trap frame 结构体、trapentry.S 或其他组员负责的代码。
+- 不修改中断处理逻辑和时钟计数。
+
+````
 
 
 ---
 
 ## 五、实验结果
 
-小组确认在 Ubuntu 22.04、WSL 2 和 QEMU 4.1.1 环境下，`make grade` 总分为 **100/100**。三个评分项分别检查 Trap 入口/寄存器恢复与断点 EPC、非法指令 EPC 前进和异常兜底、持续 supervisor timer 中断。
+`make grade` 总分为 **100/100**。三个评分项分别检查 Trap 入口/寄存器恢复与断点 EPC、非法指令 EPC 前进和异常兜底、持续 supervisor timer 中断。
 
-B 组另在 QEMU 4.1.1 下确认时钟统计输出 10 次 `100 ticks` 后模拟器正常退出。该输出对应每 100 次时钟中断统计一次，达到 10 次统计后触发 SBI 关机。运行截图由小组保存，可插入本节作为终端验证记录。
+确认时钟统计输出 10 次 `100 ticks` 后模拟器正常退出。该输出对应每 100 次时钟中断统计一次，达到 10 次统计后触发 SBI 关机。
 
 | 验证项 | 结果 |
 |--------|------|
