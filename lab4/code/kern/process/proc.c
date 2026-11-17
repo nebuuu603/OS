@@ -250,4 +250,82 @@ void proc_run(struct proc_struct *proc)
 }
 
 
+//LAB4 function2 2412854
+// Allocate a clean PCB. Kernel threads share the boot page table.
+static struct proc_struct *
+alloc_proc(void)
+{
+    struct proc_struct *proc = kmalloc(sizeof(struct proc_struct));
+    if (proc != NULL)
+    {
+        memset(proc, 0, sizeof(struct proc_struct));
+        proc->state = PROC_UNINIT;
+        proc->pid = -1;
+        // proc_run converts this kernel virtual address with PADDR.
+        proc->pgdir = (uintptr_t)boot_pgdir_va;
+        list_init(&proc->list_link);
+        list_init(&proc->hash_link);
+    }
+    return proc;
+}
+
+// Build the register template consumed by kernel_thread_entry.
+int
+kernel_thread(int (*fn)(void *), void *arg, uint32_t clone_flags)
+{
+    struct trapframe tf;
+    memset(&tf, 0, sizeof(struct trapframe));
+    tf.gpr.s0 = (uintptr_t)fn;
+    tf.gpr.s1 = (uintptr_t)arg;
+    tf.status = (read_csr(sstatus) | SSTATUS_SPP | SSTATUS_SPIE) &
+                ~SSTATUS_SIE;
+    tf.epc = (uintptr_t)kernel_thread_entry;
+    return do_fork(clone_flags | CLONE_VM, 0, &tf);
+}
+
+// Place the saved frame on the child's own kernel stack.
+static void
+copy_thread(struct proc_struct *proc, uintptr_t esp, struct trapframe *tf)
+{
+    proc->tf = (struct trapframe *)(proc->kstack + KSTACKSIZE) - 1;
+    *proc->tf = *tf;
+    proc->tf->gpr.a0 = 0;
+    proc->tf->gpr.sp = (esp != 0) ? esp : (uintptr_t)proc->tf;
+    proc->context.ra = (uintptr_t)forkret;
+    proc->context.sp = (uintptr_t)proc->tf;
+}
+
+// Adopt the boot execution context as idle, then create init through do_fork.
+void
+proc_init(void)
+{
+    list_init(&proc_list);
+    for (int i = 0; i < HASH_LIST_SIZE; i++)
+    {
+        list_init(&hash_list[i]);
+    }
+
+    idleproc = alloc_proc();
+    if (idleproc == NULL)
+    {
+        panic("cannot allocate idleproc.\n");
+    }
+    idleproc->pid = 0;
+    idleproc->state = PROC_RUNNABLE;
+    idleproc->kstack = (uintptr_t)bootstack;
+    idleproc->need_resched = 1;
+    set_proc_name(idleproc, "idle");
+    current = idleproc;
+    nr_process++;
+
+    int pid = kernel_thread(init_main, "Hello world!!", 0);
+    if (pid <= 0)
+    {
+        panic("cannot create initproc: %d.\n", pid);
+    }
+    initproc = find_proc(pid);
+    assert(initproc != NULL && initproc->pid == 1);
+    set_proc_name(initproc, "init");
+}
+
 //LAB4 function3 YOUR CODE
