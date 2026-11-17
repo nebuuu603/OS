@@ -316,7 +316,11 @@ osimg=$(make_print ucoreimg)
 swapimg=$(make_print swapimg)
 
 ## set default qemu-options
-qemuopts="-machine virt -nographic -bios default -device loader,file=bin/ucore.img,addr=0x80200000"
+# NOTE(local): OpenSBI here is fw_dynamic, so "-device loader,..." leaves the
+# firmware jump target at 0 and the kernel never runs; load the raw image with
+# "-kernel" instead (jump target 0x80200000).  Only the way the image reaches
+# the firmware changes, not the kernel code or link address.
+qemuopts="-machine virt -nographic -bios default -kernel $osimg"
 
 ## set break-function, default is readline
 brkfun=readline

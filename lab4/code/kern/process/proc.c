@@ -328,4 +328,99 @@ proc_init(void)
     set_proc_name(initproc, "init");
 }
 
-//LAB4 function3 YOUR CODE
+//LAB4 function3 2412855
+// copy_mm - give the new process "proc" its memory management instance
+//   1. a kernel thread has current->mm == NULL, so the child inherits NULL and
+//      shares the kernel address space (nothing to duplicate);
+//   2. CLONE_VM threads would share the parent's mm directly;
+//   3. copying a real user address space is left to a later lab.
+static int
+copy_mm(uint32_t clone_flags, struct proc_struct *proc)
+{
+    struct mm_struct *mm = current->mm;
+
+    if (mm != NULL && !(clone_flags & CLONE_VM))
+    {
+        return -E_UNSPECIFIED;
+    }
+    proc->mm = mm;
+    return 0;
+}
+
+//LAB4 function3 2412855
+// do_fork - create a new kernel thread/process and make it runnable
+//   1. alloc_proc: get a clean PCB, remember the parent;
+//   2. setup_kstack: give it its own kernel stack;
+//   3. copy_mm: share/hand over the memory management instance;
+//   4. copy_thread: place the first-run trapframe/context on the new stack;
+//   5. register the pid, hash entry and proc_list link atomically;
+//   6. wake it up and return its pid, or a negative error code.
+int
+do_fork(uint32_t clone_flags, uintptr_t stack, struct trapframe *tf)
+{
+    int ret = -E_NO_FREE_PROC;
+    struct proc_struct *proc;
+
+    if (nr_process >= MAX_PROCESS)
+    {
+        goto fork_out;
+    }
+
+    ret = -E_NO_MEM;
+    if ((proc = alloc_proc()) == NULL)
+    {
+        goto fork_out;
+    }
+    proc->parent = current;
+
+    if (setup_kstack(proc) != 0)
+    {
+        goto bad_fork_cleanup_proc;
+    }
+    if (copy_mm(clone_flags, proc) != 0)
+    {
+        goto bad_fork_cleanup_kstack;
+    }
+    copy_thread(proc, stack, tf);
+
+    /* Publish the new PCB only once it is fully initialized, so no lookup can
+     * observe a half-built process. */
+    bool intr_flag;
+    local_intr_save(intr_flag);
+    {
+        proc->pid = get_pid();
+        hash_proc(proc);
+        list_add(&proc_list, &(proc->list_link));
+        nr_process++;
+    }
+    local_intr_restore(intr_flag);
+
+    /* The new thread is ready to be picked by schedule(). */
+    wakeup_proc(proc);
+
+    ret = proc->pid;
+
+fork_out:
+    return ret;
+
+bad_fork_cleanup_kstack:
+    put_kstack(proc);
+bad_fork_cleanup_proc:
+    kfree(proc);
+    goto fork_out;
+}
+
+//LAB4 function3 2412855
+// cpu_idle - the body of idleproc (pid 0): give up the CPU whenever the
+// scheduler asks for it; otherwise just wait for the next rescheduling point.
+void
+cpu_idle(void)
+{
+    while (1)
+    {
+        if (current->need_resched)
+        {
+            schedule();
+        }
+    }
+}
