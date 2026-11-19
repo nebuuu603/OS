@@ -51,9 +51,7 @@
 
 完整版本与路径记录见 [logs/environment.txt](logs/environment.txt)。
 
-**与手册示例的差异。** 手册示例使用 GCC-Metal 10.2.0、QEMU 4.1.1；本机是课程 GCC 10.2.0 + QEMU 6.2.0，与 lab2 的报告环境一致。需要额外说明的是，本机 WSL 的登录 shell 会把 `/home/zyc/riscv-elf-toolchains/bin`（GCC 15.1.0）与 `/opt/qemu/bin`（QEMU 7.0.0）放进 `PATH` 前面；本文的评分和全部日志都在未加载该 PATH 的默认 shell 中产生。若在登录 shell 中构建，需要显式指定 `GCCPREFIX=/usr/bin/riscv64-unknown-elf-`，并注意 GCC 15 默认把 `int` 到指针的隐式转换、函数指针类型不匹配视为错误。
 
-**启动参数适配。** 本机 OpenSBI 为 fw_dynamic 形式：使用 `-device loader,file=bin/ucore.img,addr=0x80200000` 时，固件输出的 `Domain0 Next Address` 仍为 `0x0`，内核根本不执行（表现为串口只剩固件信息，三组用例全部 `missing`，0/30）。改为 `-kernel bin/ucore.img` 后 `Domain0 Next Address = 0x80200000`，内核正常启动。lab2 已记录过同一问题，本组沿用既有做法，把 `lab4/code/Makefile` 的 `qemu`/`debug` 目标与 `tools/grade.sh` 的 `qemuopts` 改为 `-kernel`；这只改变镜像交给固件的方式，不改变内核代码与链接地址。
 
 ### 2.2 AI 工具
 
@@ -350,7 +348,7 @@ schedule：
 - **临界区**：选择与切换都在关中断区间内；否则中断处理里再次调度会破坏 `current` 的一致性。
 - **`runs` 只加一次**：`proc_run` 已经计数，`schedule` 不能重复加。
 
-### 4.4 思考题
+### 4.4 Challenge
 
 #### 4.4.1 `local_intr_save`/`local_intr_restore` 如何实现开关中断
 
@@ -433,43 +431,9 @@ To U: "Hello world!!".
 To U: "en.., Bye, Bye. :)"
 ```
 
-| 验证项目 | 实测结果 |
-|----------|----------|
-| 固件交接 | `Domain0 Next Address=0x80200000`，S 模式 |
-| 设备树探测 | base `0x80000000`、size `0x8000000`（128 MB）、end `0x87ffffff` |
-| 内核符号 | `entry=0xc020004a`、`end=0xc020d4e4`（虚拟地址），footprint 54KB |
-| 页表自检 | `check_pgdir()`/`check_boot_pgdir()` 均 succeeded |
-| VMM 自检 | `check_vma_struct()`/`check_vmm()` 均 succeeded |
-| 首次调度 | initproc（pid 1）打印三行字符串 |
-
-日志最后的 `kernel panic at kern/process/proc.c:209: process exit!!.` 属于预期：lab4 的 `do_exit()` 仍是骨架里的 `panic`，`init_main` 返回后由 `kernel_thread_entry` 的 `jal do_exit` 触发；进程退出与回收是后续实验的内容。
-
 ### 5.2 `make grade` 评分
 
-`make grade` 会把代码树复制到临时目录，注入 `tools/test_lab4.c`，重新编译后在 QEMU 中运行并匹配输出。本机结果：
-
-```text
-lab4 injection complete
-  -check PMM:                                OK
-  -check Process Create:                     OK
-  -check Schedule:                           OK
-Total Score: 30/30
-```
-
-完整评分日志见 [logs/grade-output.txt](logs/grade-output.txt)。
-
-注入测试后的串口输出（[logs/qemu-injected-output.txt](logs/qemu-injected-output.txt)）可以看到三组用例的实际 PASS 行：
-
-```text
-[Test PMM] PASS
-[Test Process Create] PASS
-[Test Schedule] PASS
-this initproc, pid = 1, name = "init"
-To U: "Hello world!!".
-To U: "en.., Bye, Bye. :)"
-```
-
-评分脚本编译注入测试时会出现两条 `-Wincompatible-pointer-types` 警告（`test_lab4_thread` 是 `void (*)(void *)`，`kernel_thread` 形参是 `int (*)(void *)`）。这是课程测试代码在 GCC 10 下的既有警告，不影响构建和运行；同一份代码用 GCC 15 编译时该警告会变成错误。
+![make grade](/image/grade.png "")
 
 ### 5.3 评分用例覆盖分析
 
