@@ -433,7 +433,7 @@ To U: "en.., Bye, Bye. :)"
 
 ### 5.2 `make grade` 评分
 
-![make grade](/image/grade.png "")
+![make grade](image/grade.png )
 
 ### 5.3 评分用例覆盖分析
 
