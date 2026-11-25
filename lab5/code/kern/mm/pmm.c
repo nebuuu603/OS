@@ -664,3 +664,35 @@ static int get_pgtable_items(size_t left, size_t right, size_t start,
     }
     return 0;
 }
+
+
+// print_pgdir - print valid leaf mappings in the current address space.
+void print_pgdir(void)
+{
+    pde_t *pgdir = boot_pgdir_va;
+    if (current != NULL && current->mm != NULL && current->mm->pgdir != NULL)
+        pgdir = current->mm->pgdir;
+
+    cprintf("-------------------- BEGIN PAGE TABLE --------------------\n");
+    for (size_t d1 = 0; d1 < NPDEENTRY; d1++)
+    {
+        pde_t pde1 = pgdir[d1];
+        if (!(pde1 & PTE_V)) continue;
+        pte_t *pd0 = (pte_t *)KADDR(PDE_ADDR(pde1));
+        for (size_t d0 = 0; d0 < NPDEENTRY; d0++)
+        {
+            pde_t pde0 = pd0[d0];
+            if (!(pde0 & PTE_V)) continue;
+            pte_t *pt = (pte_t *)KADDR(PDE_ADDR(pde0));
+            for (size_t t = 0; t < NPTEENTRY; t++)
+            {
+                pte_t pte = pt[t];
+                if (!(pte & PTE_V) || !(pte & (PTE_R | PTE_W | PTE_X))) continue;
+                uintptr_t start = PGADDR(d1, d0, t, 0);
+                cprintf("va [0x%016lx, 0x%016lx), pa 0x%016lx, perm %s\n",
+                        start, start + PGSIZE, PTE_ADDR(pte), perm2str(pte));
+            }
+        }
+    }
+    cprintf("--------------------- END PAGE TABLE ---------------------\n");
+}

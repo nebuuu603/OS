@@ -184,6 +184,11 @@ void exception_handler(struct trapframe *tf) {
         tf->epc += trap_insn_length(tf->epc);
         break;
 
+    case CAUSE_USER_ECALL:
+        tf->epc += 4;
+        syscall();
+        break;
+
     default:
         print_trapframe(tf);
         /*
@@ -199,9 +204,6 @@ void exception_handler(struct trapframe *tf) {
         break;
     }
 }
-
-//lab5 function1 YOUR CODE update exception_handler
-
 
 static inline void trap_dispatch(struct trapframe *tf)
 {

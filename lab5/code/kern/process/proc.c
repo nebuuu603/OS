@@ -436,10 +436,65 @@ bad_fork_cleanup_proc:
 //lab5 function3 YOUR CODE
 
 
-// Lab 4 kernel-thread exit stub.
 int do_exit(int error_code)
 {
-    panic("process exit!!.\n");
+    struct mm_struct *mm = current->mm;
+
+    if (current == idleproc || current == initproc)
+    {
+        panic("cannot exit idleproc or initproc");
+    }
+
+    if (mm != NULL)
+    {
+        bool intr_flag;
+        local_intr_save(intr_flag);
+        current->mm = NULL;
+        if (mm_count_dec(mm) == 0)
+        {
+            exit_mmap(mm);
+            put_pgdir(mm);
+            mm_destroy(mm);
+        }
+        local_intr_restore(intr_flag);
+    }
+
+    current->flags |= PF_EXITING;
+    current->exit_code = error_code;
+    current->state = PROC_ZOMBIE;
+    if (current->parent != NULL &&
+        (current->parent->wait_state & WT_CHILD))
+    {
+        wakeup_proc(current->parent);
+    }
+    schedule();
+    panic("do_exit returned");
+}
+
+int do_yield(void)
+{
+    current->need_resched = 1;
+    return 0;
+}
+
+int do_kill(int pid)
+{
+    struct proc_struct *proc;
+
+    if (pid <= 0 || (proc = find_proc(pid)) == NULL)
+    {
+        return -E_INVAL;
+    }
+    proc->flags |= PF_EXITING;
+    if (proc == current)
+    {
+        proc->need_resched = 1;
+    }
+    else if (proc->state == PROC_SLEEPING)
+    {
+        wakeup_proc(proc);
+    }
+    return 0;
 }
 
 //lab5 function4 YOUR CODE
